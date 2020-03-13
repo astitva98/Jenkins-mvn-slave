@@ -2,7 +2,8 @@ FROM docker:19.03
 
 ENV JENKINS_HOME /home/jenkins
 ENV JENKINS_REMOTNG_VERSION 2.7.1
-ENV JAVA_VERSION 11.0.2
+ENV JAVA_VERSION 11.0.6
+ENV JAVA_ALPINE_VERSION 11.0.5_p10-r0
 ENV MAVEN_VERSION 3.6.3
 ENV PROTOBUF_ALPINE_VERSION 3.11.2-r1
 
@@ -17,14 +18,21 @@ RUN apk --update add \
     openssh \
     python \
     py-pip \
-    openjdk11 \
     protobuf="$PROTOBUF_ALPINE_VERSION" && \
     \
     pip install --upgrade awscli
 
+# compile and install jdk 8
+# A few problems with compiling Java from source:
+#  1. Oracle.  Licensing prevents us from redistributing the official JDK.
+#  2. Compiling OpenJDK also requires the JDK to be installed, and it gets
+#       really hairy.
 
+# Default to UTF-8 file.encoding
 ENV LANG C.UTF-8
 
+# add a simple script that can auto-detect the appropriate JAVA_HOME value
+# based on whether the JDK or only the JRE is installed
 RUN { \
         echo '#!/bin/sh'; \
         echo 'set -e'; \
@@ -34,6 +42,11 @@ RUN { \
     && chmod +x /usr/local/bin/docker-java-home
 ENV JAVA_HOME /usr/lib/jvm/java-11-openjdk
 ENV PATH $PATH:/usr/lib/jvm/java-11-openjdk/jre/bin:/usr/lib/jvm/java-11-openjdk/bin
+
+RUN set -x \
+    && apk add --no-cache \
+        openjdk11="$JAVA_ALPINE_VERSION" \
+&& [ "$JAVA_HOME" = "$(docker-java-home)" ]
 
 # Install maven
 RUN wget http://mirrors.estointernet.in/apache/maven/maven-3/3.6.3/binaries/apache-maven-3.6.3-bin.tar.gz && \
